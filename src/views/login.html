@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - AIR TEC</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #0f2027; background: linear-gradient(to right, #203a43, #0f2027); color: #fff; margin: 0; }
+        .login-box { background: rgba(255, 255, 255, 0.1); padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); backdrop-filter: blur(10px); width: 340px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+        h2 { margin-bottom: 24px; color: #4facfe; font-size: 28px; }
+        input, select, button { display: block; width: 100%; margin-bottom: 20px; padding: 12px; border-radius: 6px; border: none; box-sizing: border-box; font-size: 14px; }
+        input, select { background: rgba(255, 255, 255, 0.2); color: white; outline: none; }
+        option { background: #1c2d37; color: white; }
+        input::placeholder { color: #ccc; }
+        button { background: linear-gradient(45deg, #00c6ff, #0072ff); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 198, 255, 0.4); }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h2>Sistema AIR</h2>
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Usuario Institucional" required>
+            <input type="password" id="password" placeholder="Contraseña" required>
+            <label style="display:block; text-align:left; margin-bottom: 8px; color: #aaa;">Rol de Acceso:</label>
+            <select id="role">
+                <option value="admin">Administrador (TI)</option>
+                <option value="secretaria">Secretaría (DAIR)</option>
+                <option value="consulta">Consulta Pública</option>
+            </select>
+            <button type="submit">Ingresar al Sistema</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                usuario: document.getElementById('username').value,
+                contrasena: document.getElementById('password').value,
+                rol: document.getElementById('role').value
+            };
+            
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if(data.success) {
+                alert(`Ingreso exitoso como: ${payload.rol.toUpperCase()}`);
+                window.location.href = data.redirect;
+            } else {
+                alert('Error al autenticar: ' + data.message);
+            }
+        });
+    </script>
+</body>
+</html>
