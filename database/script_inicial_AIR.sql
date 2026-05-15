@@ -15,7 +15,7 @@ CREATE TABLE periodo_gestion (
 );
 
 
--
+
 
 -- Tabla de Asambleístas 
 CREATE TABLE asambleista (
