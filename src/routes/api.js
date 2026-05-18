@@ -1,61 +1,25 @@
-// =====================================================================
-// src/routes/api.js — Definición de rutas REST
-// =====================================================================
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 
-const AuthController         = require('../controllers/AuthController');
-const AsambleistaController  = require('../controllers/AsambleistaController');
-const FolioController        = require('../controllers/FolioController');
-const CertificacionController= require('../controllers/CertificacionController');
+// Importar los controladores
+const { login } = require('../controllers/autentificador_controller');
+const { obtenerSiguienteFolio } = require('../controllers/folio_controller');
+const { generarCertificacionPDF } = require('../controllers/certificacion_controller');
+const Asambleista = require('../models/Asambleista');
 
-const { requireAuth, requireRole } = AuthController;
+// Issue #0: Login
+router.post('/login', login);
 
-// ---------------------------------------------------------------------
-// Issue #0 — Autenticación
-// ---------------------------------------------------------------------
-router.post('/login', AuthController.login);
+// Issue #1: Folio
+router.get('/folio/nuevo', obtenerSiguienteFolio);
 
-// ---------------------------------------------------------------------
-// Issue #1 — Folios
-// ---------------------------------------------------------------------
-router.get('/folio/nuevo',
-    requireAuth, requireRole('Secretaria','Administrador'),
-    FolioController.obtenerSiguiente
-);
-router.get('/folio/anio/:anio',
-    requireAuth,
-    FolioController.consultarPorAnio
-);
+// Issue #3: Buscador Avanzado
+router.post('/asambleistas/buscar', async (req, res) => {
+    const resultados = await Asambleista.buscarAvanzado(req.body);
+    res.json(resultados);
+});
 
-// ---------------------------------------------------------------------
-// Issues #3, #9 — Asambleístas
-// ---------------------------------------------------------------------
-router.get ('/asambleistas',
-    requireAuth,
-    AsambleistaController.listar
-);
-router.get ('/asambleistas/buscar',
-    requireAuth,
-    AsambleistaController.buscar
-);
-router.post('/asambleistas',
-    requireAuth, requireRole('Secretaria','Administrador'),
-    AsambleistaController.registrar
-);
-
-// Issue #2 — Hoja de vida (trazabilidad de identidad y nombramientos)
-router.get('/asambleistas/:cedula/hoja-vida',
-    requireAuth, requireRole('Secretaria','Administrador'),
-    AsambleistaController.hojaDeVida
-);
-
-// ---------------------------------------------------------------------
-// Issues #4, #14 — Certificaciones (PDF + QR + Hash)
-// ---------------------------------------------------------------------
-router.post('/certificacion/generar',
-    requireAuth, requireRole('Secretaria','Administrador'),
-    CertificacionController.generarCertificacionPDF
-);
+// Issue #4 y #14: Generar PDF con QR
+router.post('/certificacion/generar', generarCertificacionPDF);
 
 module.exports = router;
