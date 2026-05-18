@@ -7,8 +7,8 @@ const pool = new Pool({
     user:     process.env.DB_USER     || 'postgres',
     host:     process.env.DB_HOST     || 'localhost',
     database: process.env.DB_NAME     || 'proyecto_air',
-    password: process.env.DB_PASSWORD || 'EMMA20072006am.',
-    port:     Number(process.env.DB_PORT) || 5430,
+    password: process.env.DB_PASSWORD || 'postgres',
+    port:     Number(process.env.DB_PORT) || 5432,
     max: 20,
     idleTimeoutMillis: 30000,
 });
