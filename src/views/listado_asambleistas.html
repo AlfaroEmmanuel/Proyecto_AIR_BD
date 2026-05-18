@@ -2,27 +2,36 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Consulta de Atestados - AIR</title>
+    <title>Listado de Asambleístas - AIR</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f6f9; }
-        .search-container { margin-bottom: 25px; display: flex; gap: 10px; }
-        input { padding: 10px; width: 300px; border: 1px solid #ccc; border-radius: 4px; }
-        button { background-color: #0073e6; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #003366; color: white; }
-        tr:hover { background-color: #f1f1f1; }
-        .badge { padding: 5px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-        .active { background-color: #e2fbe8; color: #1e7e34; }
-        .inactive { background-color: #fce8e6; color: #bd2130; }
+        body { font-family: Arial, sans-serif; margin:30px; background:#f4f6f9; }
+        h2 { color:#003366; }
+        .search-container { margin-bottom:25px; display:flex; gap:10px; flex-wrap:wrap; }
+        input { padding:10px; border:1px solid #ccc; border-radius:4px; }
+        button { background:#0073e6; color:white; padding:10px 20px; border:none; border-radius:4px; cursor:pointer; }
+        button.secondary { background:#6c757d; }
+        button.primary-action { background:#003366; }
+        table { width:100%; border-collapse:collapse; margin-top:20px; background:#fff; }
+        th, td { padding:12px; text-align:left; border-bottom:1px solid #ddd; font-size:14px; }
+        th { background:#003366; color:white; }
+        tr:hover { background:#f1f1f1; }
+        .badge { padding:5px 10px; border-radius:12px; font-size:12px; font-weight:bold; }
+        .badge-vigente { background:#e2fbe8; color:#1e7e34; }
+        .badge-inactivo { background:#fce8e6; color:#bd2130; }
+        .toolbar { display:flex; justify-content:space-between; align-items:center; }
     </style>
 </head>
 <body>
-    <h2>Consulta Pública de Asambleístas e Historial</h2>
+    <div class="toolbar">
+        <h2>Listado y Búsqueda de Asambleístas</h2>
+        <a href="/registro_asambleista.html"><button class="primary-action">+ Nuevo Asambleísta</button></a>
+    </div>
+
     <div class="search-container">
-        <input type="text" id="searchCedula" placeholder="Buscar por Cédula...">
-        <button onclick="cargarTabla()">Buscar Miembro</button>
-        <button style="background-color: #6c757d;" onclick="limpiarFiltro()">Ver Todos</button>
+        <input type="text" id="searchCedula" placeholder="Buscar por cédula...">
+        <input type="text" id="searchNombre" placeholder="Buscar por nombre...">
+        <button onclick="cargarTabla()">Buscar</button>
+        <button class="secondary" onclick="limpiar()">Ver Todos</button>
     </div>
 
     <table>
@@ -31,50 +40,83 @@
                 <th>Cédula</th>
                 <th>Nombre Completo</th>
                 <th>Correo</th>
-                <th>Sector</th>
-                <th>Año Gestión</th>
-                <th>Estado Nombramiento</th>
+                <th>Sector Actual</th>
+                <th>Estado</th>
+                <th>Acciones</th>
             </tr>
         </thead>
-        <tbody id="tablaBody">
-            </tbody>
+        <tbody id="tablaBody"></tbody>
     </table>
 
     <script>
-        async function cargarTabla(cedula = '') {
-            let url = '/api/asambleistas';
-            if (cedula) url += `?cedula=${cedula}`;
+        const token = localStorage.getItem('air_token');
+        if (!token) window.location.href = '/login.html';
 
-            const response = await fetch(url);
-            const miembros = await response.json();
-            
+        async function cargarTabla() {
+            const cedula = document.getElementById('searchCedula').value.trim();
+            const nombre = document.getElementById('searchNombre').value.trim();
+
+            const params = new URLSearchParams();
+            if (cedula) params.append('cedula', cedula);
+            if (nombre) params.append('nombre', nombre);
+
+            const url = params.toString()
+                ? `/api/asambleistas/buscar?${params}`
+                : '/api/asambleistas';
+
+            const resp = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (resp.status === 401) {
+                localStorage.clear();
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const miembros = await resp.json();
             const tbody = document.getElementById('tablaBody');
             tbody.innerHTML = '';
 
-            miembros.forEach(m => {
-                const nombreCompleto = `${m.nombre} ${m.primer_apellido} ${m.segundo_apellido || ''}`;
-                const estadoTxt = m.estado_activo ? 'Activo' : 'Histórico';
-                const estadoClass = m.estado_activo ? 'active' : 'inactive';
+            // Cuando es búsqueda detallada, agrupamos por cédula
+            const map = new Map();
+            for (const m of miembros) {
+                if (!map.has(m.cedula)) {
+                    map.set(m.cedula, {
+                        cedula: m.cedula,
+                        nombre_completo: m.nombre_completo
+                            || `${m.nombre} ${m.primer_apellido}${m.segundo_apellido ? ' ' + m.segundo_apellido : ''}`,
+                        correo: m.correo_institucional,
+                        sector: m.sector_actual || m.nombre_sector || '—',
+                        estado: m.estado || m.estado_actual || 'INACTIVO'
+                    });
+                }
+            }
 
+            map.forEach(m => {
+                const cls = m.estado === 'VIGENTE' ? 'badge-vigente' : 'badge-inactivo';
                 tbody.innerHTML += `
                     <tr>
                         <td>${m.cedula}</td>
-                        <td>${nombreCompleto}</td>
-                        <td>${m.correo_institucional}</td>
-                        <td>${m.nombre_sector}</td>
-                        <td>${m.anio_gestion}</td>
-                        <td><span class="badge ${estadoClass}">${estadoTxt}</span></td>
-                    </tr>
-                `;
+                        <td>${m.nombre_completo}</td>
+                        <td>${m.correo || ''}</td>
+                        <td>${m.sector}</td>
+                        <td><span class="badge ${cls}">${m.estado}</span></td>
+                        <td><a href="/hoja_vida.html?cedula=${encodeURIComponent(m.cedula)}" style="color:#3182ce;">Ver hoja de vida →</a></td>
+                    </tr>`;
             });
+
+            if (map.size === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#888;">Sin resultados.</td></tr>';
+            }
         }
 
-        function limpiarFiltro() {
+        function limpiar() {
             document.getElementById('searchCedula').value = '';
+            document.getElementById('searchNombre').value = '';
             cargarTabla();
         }
 
-        // Carga inicial al abrir la página
         window.onload = () => cargarTabla();
     </script>
 </body>
