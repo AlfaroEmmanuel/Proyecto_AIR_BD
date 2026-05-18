@@ -1,29 +1,135 @@
-<form id="formLogin">
-    <input type="email" id="username" placeholder="Correo institucional" required>
-    <input type="password" id="password" placeholder="Contraseña" required>
-    <button type="submit">Iniciar Sesión</button>
-</form>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema AIR - Iniciar Sesión</title>
+    <style>
+        /* Estilos básicos integrados para que la pantalla se vea limpia y ordenada en el video */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h2 {
+            color: #1a365d;
+            margin-bottom: 6px;
+        }
+        p {
+            color: #718096;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #4a5568;
+            font-weight: 600;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3182ce;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2b6cb0;
+        }
+    </style>
+</head>
+<body>
 
-<script>
-document.getElementById('formLogin').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
+    <div class="login-container">
+        <h2>Sistema AIR</h2>
+        <p>Asamblea Institucional Representativa - TEC</p>
+        
+        <form id="formLogin">
+            <div class="form-group">
+                <label for="username">Correo Institucional</label>
+                <input type="email" id="username" placeholder="ejemplo@tec.ac.cr" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+            
+            <button type="submit">Iniciar Sesión</button>
+        </form>
+    </div>
 
-    const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-    });
+    <script>
+        document.getElementById('formLogin').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const usernameInput = document.getElementById('username').value;
+            const passwordInput = document.getElementById('password').value;
 
-    const data = await response.json();
-    if (data.exito) {
-        alert(`¡Bienvenido! Rol: ${data.rol}`);
-        // Guarda el rol localmente para controlar qué mostrar en la siguiente pantalla
-        localStorage.setItem('rolUsuario', data.rol);
-        window.location.href = data.redireccion;
-    } else {
-        alert('Error: ' + data.mensaje); // Notificación en pantalla (Requisito Fase 4)
-    }
-});
-</script>
+            try {
+                // Envía las credenciales reales de forma segura en formato JSON al backend
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: usernameInput, password: passwordInput })
+                });
+
+                const data = await response.json();
+
+                if (data.exito) {
+                    alert(`¡Bienvenido! Rol: ${data.rol}`);
+                    
+                    // Almacenamos el rol devuelto por la Base de Datos para el control de accesos (RBAC)
+                    localStorage.setItem('rolUsuario', data.rol);
+                    
+                    // Redirecciona automáticamente a la pantalla asignada por el backend
+                    window.location.href = data.redireccion;
+                } else {
+                    // Retroalimentación visual inmediata en pantalla (Fase 4)
+                    alert('Error de Autenticación: ' + data.mensaje);
+                }
+            } catch (error) {
+                console.error('Error en la solicitud de login:', error);
+                alert('No se pudo conectar con el servidor. Verifica que app.js esté corriendo.');
+            }
+        });
+    </script>
+
+</body>
+</html>
