@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Certificaciones — AIR</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 1.5rem; color: #1f2937; }
+        .contenedor { max-width: 960px; margin: 0 auto; }
+        .subtitulo { color: #6b7280; }
+        .filtros { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; margin-bottom: 1.5rem; }
+        .filtros label { display: flex; flex-direction: column; font-size: .85rem; gap: .25rem; }
+        input { padding: .45rem; border: 1px solid #ccc; border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+        th, td { padding: .6rem .8rem; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        th { background: #f5f5f7; }
+        .badge { padding: .15rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+        .badge.activo { background: #e3f6e8; color: #1b7a3d; } .badge.anulado { background: #fdecec; color: #b3261e; }
+        .hash { font-family: monospace; font-size: .75rem; color: #6b7280; }
+        .btn { background: #0f2b46; color: #fff; border: none; padding: .5rem 1rem; border-radius: 8px; cursor: pointer; }
+        .vacio { text-align: center; color: #9ca3af; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <main class="contenedor">
+        <h1>Historial de Certificaciones</h1>
+        <p class="subtitulo">Registro de emisiones. Cada certificación es inmutable (trigger de no-repudio).</p>
+
+        <section class="filtros">
+            <label>Desde <input type="date" id="fDesde"></label>
+            <label>Hasta <input type="date" id="fHasta"></label>
+            <label>Funcionario (ID) <input type="number" id="fUsuario" placeholder="opcional"></label>
+            <button id="btnFiltrar" class="btn">Filtrar</button>
+        </section>
+
+        <table>
+            <thead><tr><th>Folio</th><th>Asambleísta</th><th>Emitido</th><th>Estado</th><th>Emisor</th><th>Hash</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+        </table>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        const headers = { 'Authorization': 'Bearer ' + token };
+
+        function badge(estado) {
+            const c = estado === 'ACTIVO' ? 'activo' : 'anulado';
+            return `<span class="badge ${c}">${estado}</span>`;
+        }
+
+        async function cargar() {
+            const p = new URLSearchParams();
+            const d = document.getElementById('fDesde').value, h = document.getElementById('fHasta').value, u = document.getElementById('fUsuario').value;
+            if (d) p.append('desde', d); if (h) p.append('hasta', h); if (u) p.append('idUsuario', u);
+            const tbody = document.getElementById('tbody');
+            tbody.innerHTML = '<tr><td colspan="6" class="vacio">Cargando…</td></tr>';
+            try {
+                const res = await fetch('/api/reportes/certificaciones-historial?' + p.toString(), { headers });
+                if (res.status === 401) { localStorage.clear(); location.href = '/login.html'; return; }
+                const r = await res.json();
+                const filas = r.datos || [];
+                if (!filas.length) { tbody.innerHTML = '<tr><td colspan="6" class="vacio">Sin certificaciones para los filtros.</td></tr>'; return; }
+                tbody.innerHTML = filas.map(f => `
+                    <tr>
+                        <td>${f.folio_unico}</td>
+                        <td>${f.nombre_completo}</td>
+                        <td>${new Date(f.fecha_emision).toLocaleString('es-CR')}</td>
+                        <td>${badge(f.estado)}</td>
+                        <td>${f.emisor || '—'}</td>
+                        <td class="hash">${(f.hash_sha256 || '').slice(0, 24)}…</td>
+                    </tr>`).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="6" class="vacio">Error al cargar.</td></tr>';
+            }
+        }
+
+        document.getElementById('btnFiltrar').addEventListener('click', cargar);
+        cargar();
+    </script>
+</body>
+</html>
