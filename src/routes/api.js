@@ -13,7 +13,10 @@ const PropuestaController   = require('../controllers/PropuestaController');
 const AsistenciaController  = require('../controllers/AsistenciaController');
 const ComisionController    = require('../controllers/ComisionController');
 const ReportesController = require('../controllers/ReportesController');
+const CertificadoController = require('../controllers/CertificadoController');
+const AnulacionController   = require('../controllers/AnulacionController');
 const { requireAuth, requireRole } = AuthController;
+
 
 // ---------------------------------------------------------------------
 // Issue #0 — Autenticación
@@ -112,7 +115,36 @@ router.get('/reportes/asambleistas-mas-certificados',
     requireAuth, requireRole('Secretaria','Administrador'), ReportesController.asambleistasMasCertificados);
 router.get('/reportes/distribucion-sectores',
     requireAuth, requireRole('Secretaria','Administrador'), ReportesController.distribucionSectores);
+router.post('/certificacion/generar',
+    requireAuth, requireRole('Secretaria','Administrador'),
+    CertificadoController.generarCertificacionPDF);
 
+// ---------------------------------------------------------------------
+// Issue #14 — Emisión y Verificación
+// ---------------------------------------------------------------------
+router.post('/certificaciones/emitir',
+    requireAuth, requireRole('Secretaria','Administrador'), CertificadoController.emitir);
+
+// PÚBLICAS (sin auth) — usadas por terceros y por el QR del PDF
+router.get ('/certificaciones/verificar/:folio', CertificadoController.verificar);
+router.post('/certificaciones/verificar/hash',   CertificadoController.verificarHash);
+
+router.get ('/certificaciones/historial/:cedula',
+    requireAuth, requireRole('Secretaria','Administrador'), CertificadoController.historial);
+
+// ---------------------------------------------------------------------
+// Issue #15 — Anulaciones y Sustituciones (solo Administrador)
+// ---------------------------------------------------------------------
+router.post('/anulaciones/anular',
+    requireAuth, requireRole('Administrador'), AnulacionController.anular);
+router.post('/anulaciones/sustituir',
+    requireAuth, requireRole('Administrador'), AnulacionController.sustituir);
+router.get ('/anulaciones/historial',
+    requireAuth, requireRole('Administrador'), AnulacionController.historial);
+router.get ('/anulaciones/historial/:folio',
+    requireAuth, requireRole('Administrador'), AnulacionController.historialPorFolio);
+router.get ('/anulaciones/estado/:folio',
+    requireAuth, requireRole('Secretaria','Administrador'), AnulacionController.estado);
 // ---- #13 — Historial global de certificaciones ----
 // (el historial POR CÉDULA ya existe en CertificadoController.historial del #14)
 router.get('/reportes/certificaciones-historial',
