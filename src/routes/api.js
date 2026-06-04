@@ -12,6 +12,7 @@ const SesionController      = require('../controllers/SesionController');
 const PropuestaController   = require('../controllers/PropuestaController');
 const AsistenciaController  = require('../controllers/AsistenciaController');
 const ComisionController    = require('../controllers/ComisionController');
+const ReportesController = require('../controllers/ReportesController');
 const { requireAuth, requireRole } = AuthController;
 
 // ---------------------------------------------------------------------
@@ -98,5 +99,22 @@ router.post('/comisiones',
     requireAuth, requireRole('Secretaria','Administrador'), ComisionController.crear);
 router.post('/comisiones/:id_comision/integrantes',
     requireAuth, requireRole('Secretaria','Administrador'), ComisionController.agregarIntegrantes);
+/ ---- #7 / Ext #8 — Asistencia consolidada de un asambleísta ----
+router.get('/reportes/asistencia/:cedula',
+    requireAuth, ReportesController.asistenciaAsambleista);
 
+// ---- #16 — Reportería administrativa (JSON o ?formato=csv) ----
+router.get('/reportes/kpis',
+    requireAuth, requireRole('Secretaria','Administrador'), ReportesController.kpis);
+router.get('/reportes/certificaciones-mensuales',
+    requireAuth, requireRole('Secretaria','Administrador'), ReportesController.certificacionesMensuales);
+router.get('/reportes/asambleistas-mas-certificados',
+    requireAuth, requireRole('Secretaria','Administrador'), ReportesController.asambleistasMasCertificados);
+router.get('/reportes/distribucion-sectores',
+    requireAuth, requireRole('Secretaria','Administrador'), ReportesController.distribucionSectores);
+
+// ---- #13 — Historial global de certificaciones ----
+// (el historial POR CÉDULA ya existe en CertificadoController.historial del #14)
+router.get('/reportes/certificaciones-historial',
+    requireAuth, requireRole('Secretaria','Administrador'), ReportesController.historialCertificaciones);
 module.exports = router;
