@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle de Comisión — AIR</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 1.5rem; color: #1f2937; }
+        .contenedor { max-width: 820px; margin: 0 auto; }
+        .subtitulo { color: #6b7280; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+        th, td { padding: .6rem .8rem; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        th { background: #f5f5f7; }
+        .agregar { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; }
+        .tags { display: flex; flex-wrap: wrap; gap: .4rem; margin: .6rem 0; }
+        .tag { background: #e3f6e8; color: #1b7a3d; padding: .25rem .6rem; border-radius: 999px; font-size: .8rem; display: flex; gap: .4rem; align-items: center; }
+        .tag button { border: none; background: none; cursor: pointer; color: #1b7a3d; font-weight: 700; }
+        .buscador { padding: .5rem .7rem; width: 100%; max-width: 340px; border: 1px solid #ccc; border-radius: 8px; }
+        .sugerencias { border: 1px solid #e5e7eb; border-radius: 8px; max-height: 180px; overflow-y: auto; max-width: 340px; }
+        .sugerencias div { padding: .45rem .7rem; cursor: pointer; } .sugerencias div:hover { background: #f5f5f7; }
+        .btn { background: #0f2b46; color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; cursor: pointer; margin-top: 1rem; }
+        select { padding: .45rem; border: 1px solid #ccc; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <main class="contenedor">
+        <h1 id="titulo">Comisión</h1>
+        <p id="objeto" class="subtitulo"></p>
+
+        <h2>Integrantes activos</h2>
+        <table id="tablaIntegrantes">
+            <thead><tr><th>Cédula</th><th>Nombre</th><th>Rol</th><th>Ingreso</th></tr></thead>
+            <tbody><tr><td colspan="4">Cargando…</td></tr></tbody>
+        </table>
+
+        <section class="agregar">
+            <h2>Agregar integrantes</h2>
+            <label>Rol: <select id="selRol"></select></label>
+            <div class="tags" id="tagsSeleccionados"></div>
+            <input type="text" id="buscador" class="buscador" placeholder="Buscar asambleísta…">
+            <div class="sugerencias" id="sugerencias"></div>
+            <button id="btnAgregar" class="btn">Agregar seleccionados</button>
+            <p id="msg"></p>
+        </section>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+        const idComision = new URLSearchParams(location.search).get('id');
+        const seleccionados = new Map();
+
+        async function api(url, opts = {}) {
+            const res = await fetch(url, { headers, ...opts });
+            if (res.status === 401) { localStorage.clear(); location.href = '/login.html'; return null; }
+            return res.json();
+        }
+
+        async function cargarDetalle() {
+            const r = await api(`/api/comisiones/${idComision}`);
+            if (!r || !r.exito) return;
+            const c = r.datos;
+            document.getElementById('titulo').textContent = c.nombre;
+            document.getElementById('objeto').textContent = c.objeto || '';
+            document.querySelector('#tablaIntegrantes tbody').innerHTML =
+                (c.integrantes || []).map(i => `
+                    <tr><td>${i.cedula_asambleista}</td><td>${i.nombre_completo}</td>
+                        <td>${i.rol}</td><td>${new Date(i.fecha_ingreso).toLocaleDateString('es-CR')}</td></tr>`).join('')
+                || '<tr><td colspan="4" style="color:#9ca3af">Sin integrantes activos.</td></tr>';
+        }
+
+        // Roles fijos del catálogo (Coordinador=1, Secretario=2, Integrante=3 según el seed)
+        document.getElementById('selRol').innerHTML =
+            [[1,'Coordinador'],[2,'Secretario'],[3,'Integrante']]
+            .map(([id,n]) => `<option value="${id}">${n}</option>`).join('');
+
+        function renderTags() {
+            document.getElementById('tagsSeleccionados').innerHTML =
+                [...seleccionados].map(([ced, nom]) => `<span class="tag">${nom}<button data-ced="${ced}">×</button></span>`).join('');
+            document.querySelectorAll('.tag button').forEach(b =>
+                b.addEventListener('click', () => { seleccionados.delete(b.dataset.ced); renderTags(); }));
+        }
+
+        let debounce;
+        document.getElementById('buscador').addEventListener('input', (e) => {
+            clearTimeout(debounce);
+            const q = e.target.value.trim();
+            if (q.length < 2) { document.getElementById('sugerencias').innerHTML = ''; return; }
+            debounce = setTimeout(async () => {
+                // Reutiliza el buscador de asambleístas del Sprint 2 (Issue #3)
+                const r = await api('/api/asambleistas/buscar?nombre=' + encodeURIComponent(q));
+                const lista = Array.isArray(r) ? r : (r && r.datos ? r.datos : []);
+                document.getElementById('sugerencias').innerHTML = lista.map(a => {
+                    const nom = a.nombre_completo || `${a.nombre} ${a.primer_apellido || ''}`.trim();
+                    return `<div data-ced="${a.cedula}" data-nom="${nom}">${nom} (${a.cedula})</div>`;
+                }).join('');
+                document.querySelectorAll('#sugerencias div').forEach(d =>
+                    d.addEventListener('click', () => {
+                        seleccionados.set(d.dataset.ced, d.dataset.nom);
+                        renderTags();
+                        document.getElementById('sugerencias').innerHTML = '';
+                        document.getElementById('buscador').value = '';
+                    }));
+            }, 250);
+        });
+
+        document.getElementById('btnAgregar').addEventListener('click', async () => {
+            if (seleccionados.size === 0) { document.getElementById('msg').textContent = 'Selecciona al menos un asambleísta.'; return; }
+            const id_rol = Number(document.getElementById('selRol').value);
+            const integrantes = [...seleccionados.keys()].map(cedula => ({ cedula, id_rol }));
+            const r = await api(`/api/comisiones/${idComision}/integrantes`, { method: 'POST', body: JSON.stringify({ integrantes }) });
+            document.getElementById('msg').textContent = r ? r.mensaje : 'Error.';
+            seleccionados.clear(); renderTags(); cargarDetalle();
+        });
+
+        cargarDetalle();
+    </script>
+</body>
+</html>
