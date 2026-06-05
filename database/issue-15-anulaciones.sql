@@ -184,31 +184,3 @@ $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION obtener_historial_anulaciones IS
 'Issue #15: retorna el historial de anulaciones. Consumida por AnulacionController.historial().';
-
-
--- =====================================================================
--- CONSULTAS DE VERIFICACIÓN (descomentar para probar)
--- =====================================================================
-/*
--- 1. Anular una certificación
-SELECT * FROM anular_certificacion(
-    'DAIR-001-2026',
-    'Error en el sector de representación del asambleísta.',
-    1,
-    NULL
-);
-
--- 2. Verificar que quedó como ANULADO
-SELECT folio_unico, estado, motivo_anulacion FROM certificacion_emitida
-WHERE folio_unico = 'DAIR-001-2026';
-
--- 3. Ver historial de anulaciones
-SELECT * FROM obtener_historial_anulaciones();
-SELECT * FROM obtener_historial_anulaciones('DAIR-001-2026');
-
--- 4. Intentar anular de nuevo (debe fallar)
-SELECT * FROM anular_certificacion('DAIR-001-2026', 'Segundo intento', 1, NULL);
-
--- 5. Intentar modificar directamente (debe lanzar excepción del trigger)
-UPDATE certificacion_emitida SET hash_sha256 = 'hackeado' WHERE folio_unico = 'DAIR-001-2026';
-*/
