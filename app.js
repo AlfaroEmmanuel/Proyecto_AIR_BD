@@ -27,6 +27,12 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'src', 'views', 'login.html'));
 });
 
+// PÁGINA PÚBLICA de verificación (la abre el QR impreso). SIN auth.
+// Acepta /verificar/:folio y /validar/:folio.
+app.get(['/verificar/:folio', '/validar/:folio'], (req, res) => {
+    res.sendFile(path.join(__dirname, 'src', 'views', 'validar_certificacion.html'));
+});
+
 // Manejo global de errores
 app.use((err, req, res, next) => {
     console.error('[ERROR]', err);
