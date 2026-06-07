@@ -7,7 +7,6 @@ const router  = express.Router();
 const AuthController         = require('../controllers/AuthController');
 const AsambleistaController  = require('../controllers/AsambleistaController');
 const FolioController        = require('../controllers/FolioController');
-const CertificacionController= require('../controllers/CertificacionController');
 const SesionController      = require('../controllers/SesionController');
 const PropuestaController   = require('../controllers/PropuestaController');
 const AsistenciaController  = require('../controllers/AsistenciaController');
@@ -58,12 +57,8 @@ router.get('/asambleistas/:cedula/hoja-vida',
 );
 
 // ---------------------------------------------------------------------
-// Issues #4, #14 — Certificaciones (PDF + QR + Hash)
+// Issue #11 — Sesiones y Votaciones
 // ---------------------------------------------------------------------
-router.post('/certificacion/generar',
-    requireAuth, requireRole('Secretaria','Administrador'),
-    CertificacionController.generarCertificacionPDF
-);
 router.get ('/sesiones',
     requireAuth, SesionController.listar);
 router.post('/sesiones',
@@ -77,7 +72,7 @@ router.post('/sesiones/:id/votacion',
 router.post('/propuestas',
     requireAuth, requireRole('Secretaria','Administrador'), PropuestaController.crear);
 router.get ('/propuestas/:id_propuesta/leyenda',
-    requireAuth, PropuestaController.obtenerLeyendaLegal);   // consumido por #17 (Persona C)
+    requireAuth, PropuestaController.obtenerLeyendaLegal);   // consumido por #17
 
 // ---------------------------------------------------------------------
 // Issue #12 — Asistencias
@@ -102,11 +97,16 @@ router.post('/comisiones',
     requireAuth, requireRole('Secretaria','Administrador'), ComisionController.crear);
 router.post('/comisiones/:id_comision/integrantes',
     requireAuth, requireRole('Secretaria','Administrador'), ComisionController.agregarIntegrantes);
-/ ---- #7 / Ext #8 — Asistencia consolidada de un asambleísta ----
+
+// ---------------------------------------------------------------------
+// Issues #7 / Ext #8 — Reporte de asistencia consolidada
+// ---------------------------------------------------------------------
 router.get('/reportes/asistencia/:cedula',
     requireAuth, ReportesController.asistenciaAsambleista);
 
-// ---- #16 — Reportería administrativa (JSON o ?formato=csv) ----
+// ---------------------------------------------------------------------
+// Issue #16 — Reportería administrativa (JSON o ?formato=csv)
+// ---------------------------------------------------------------------
 router.get('/reportes/kpis',
     requireAuth, requireRole('Secretaria','Administrador'), ReportesController.kpis);
 router.get('/reportes/certificaciones-mensuales',
@@ -115,6 +115,15 @@ router.get('/reportes/asambleistas-mas-certificados',
     requireAuth, requireRole('Secretaria','Administrador'), ReportesController.asambleistasMasCertificados);
 router.get('/reportes/distribucion-sectores',
     requireAuth, requireRole('Secretaria','Administrador'), ReportesController.distribucionSectores);
+
+// ---- #13 — Historial global de certificaciones ----
+router.get('/reportes/certificaciones-historial',
+    requireAuth, requireRole('Secretaria','Administrador'), ReportesController.historialCertificaciones);
+
+// ---------------------------------------------------------------------
+// Issue #17 — MOTOR: genera y devuelve el PDF inline
+// (Única ruta de generación: usa el motor completo, no el básico del Sprint 2)
+// ---------------------------------------------------------------------
 router.post('/certificacion/generar',
     requireAuth, requireRole('Secretaria','Administrador'),
     CertificadoController.generarCertificacionPDF);
@@ -145,8 +154,5 @@ router.get ('/anulaciones/historial/:folio',
     requireAuth, requireRole('Administrador'), AnulacionController.historialPorFolio);
 router.get ('/anulaciones/estado/:folio',
     requireAuth, requireRole('Secretaria','Administrador'), AnulacionController.estado);
-// ---- #13 — Historial global de certificaciones ----
-// (el historial POR CÉDULA ya existe en CertificadoController.historial del #14)
-router.get('/reportes/certificaciones-historial',
-    requireAuth, requireRole('Secretaria','Administrador'), ReportesController.historialCertificaciones);
+
 module.exports = router;
