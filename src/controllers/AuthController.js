@@ -28,7 +28,7 @@ const login = async (req, res) => {
 
         // Pantalla destino según el rol
         const redireccion = (usuario.nombre_rol === 'Secretaria' || usuario.nombre_rol === 'Administrador')
-            ? '/registro_asambleista.html'
+            ? '/inicio.html'
             : '/listado_asambleistas.html';
 
         return res.json({
