@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anular Certificación — AIR</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; color: #1f2937; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
+        .modal { background: #fff; border-radius: 14px; padding: 1.75rem; width: 100%; max-width: 460px; }
+        .modal h2 { margin-top: 0; }
+        .modal label { display: block; font-size: .9rem; margin: 1rem 0 .35rem; }
+        .modal textarea { width: 100%; min-height: 90px; padding: .6rem; border: 1px solid #ccc; border-radius: 8px; resize: vertical; }
+        .contador { font-size: .8rem; color: #6b7280; text-align: right; } .contador.ok { color: #1b7a3d; }
+        .acciones { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.25rem; }
+        .btn { padding: .55rem 1.1rem; border-radius: 8px; border: none; cursor: pointer; }
+        .btn-cancelar { background: #e5e7eb; } .btn-anular { background: #b3261e; color: #fff; } .btn-anular:disabled { background: #e0a9a4; cursor: not-allowed; }
+        .msg { margin-top: .8rem; font-size: .9rem; }
+    </style>
+</head>
+<body>
+    <div class="modal-overlay">
+        <div class="modal">
+            <h2>Anular certificación</h2>
+            <p>Folio: <strong id="folioLabel"></strong></p>
+            <p style="font-size:.85rem;color:#6b7280">La anulación es permanente. El folio queda marcado como inválido y no se reutiliza.</p>
+            <label for="motivo">Motivo (mínimo 10 caracteres)</label>
+            <textarea id="motivo" placeholder="Describa el motivo de la anulación…"></textarea>
+            <div class="contador" id="contador">0 / 10</div>
+            <div class="acciones">
+                <button class="btn btn-cancelar" onclick="history.back()">Cancelar</button>
+                <button class="btn btn-anular" id="btnAnular" disabled>Anular folio</button>
+            </div>
+            <div class="msg" id="msg"></div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        const folio = new URLSearchParams(location.search).get('folio') || '';
+        document.getElementById('folioLabel').textContent = folio;
+
+        const motivo = document.getElementById('motivo');
+        const contador = document.getElementById('contador');
+        const btn = document.getElementById('btnAnular');
+
+        motivo.addEventListener('input', () => {
+            const n = motivo.value.trim().length;
+            contador.textContent = `${n} / 10`;
+            contador.className = 'contador ' + (n >= 10 ? 'ok' : '');
+            btn.disabled = n < 10;
+        });
+
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/anulaciones/anular', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folio, motivo: motivo.value.trim() })
+                });
+                const r = await res.json();
+                const msg = document.getElementById('msg');
+                msg.textContent = r.mensaje || (r.exito ? 'Folio anulado.' : 'Error.');
+                msg.style.color = r.exito ? '#1b7a3d' : '#b3261e';
+            } catch (e) {
+                document.getElementById('msg').textContent = 'Error de conexión.';
+            }
+            btn.disabled = false;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación de Certificación — AIR · TEC</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f3f4f6; margin: 0; padding: 2rem 1rem; color: #1f2937; }
+        .card { max-width: 520px; margin: 2rem auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.08); overflow: hidden; }
+        .header { background: #0f2b46; color: #fff; padding: 1.5rem; text-align: center; }
+        .header small { opacity: .8; }
+        .estado { padding: 2rem 1.5rem; text-align: center; }
+        .estado .icono { font-size: 3rem; }
+        .valido h2 { color: #1b7a3d; } .anulado h2 { color: #b3261e; } .noencontrado h2 { color: #6b7280; }
+        .detalles { padding: 0 1.5rem 2rem; }
+        .detalles dl { display: grid; grid-template-columns: 130px 1fr; gap: .5rem 1rem; font-size: .9rem; }
+        .detalles dt { color: #6b7280; }
+        .hash { font-family: monospace; font-size: .72rem; word-break: break-all; }
+        .buscador { padding: 1.5rem; border-top: 1px solid #eee; }
+        .buscador input { width: 100%; padding: .6rem; border: 1px solid #ccc; border-radius: 8px; margin-bottom: .5rem; }
+        .buscador button { width: 100%; padding: .6rem; background: #0f2b46; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <div>Instituto Tecnológico de Costa Rica</div>
+            <small>Asamblea Institucional Representativa — Verificación de Documentos</small>
+        </div>
+        <div id="resultado" class="estado"><p>Verificando…</p></div>
+        <div class="buscador">
+            <input type="text" id="inputFolio" placeholder="Ingrese un folio, ej. DAIR-001-2026">
+            <button id="btnVerificar">Verificar otro folio</button>
+        </div>
+    </div>
+
+    <script>
+        // Ruta pública: /verificar/:folio o /validar/:folio
+        function folioDeURL() {
+            const partes = location.pathname.split('/').filter(Boolean);
+            const i = partes.findIndex(p => p === 'verificar' || p === 'validar');
+            return i >= 0 && partes[i + 1] ? decodeURIComponent(partes[i + 1]) : null;
+        }
+        function fmt(f) { return f ? new Date(f).toLocaleString('es-CR') : ''; }
+
+        async function verificar(folio) {
+            const cont = document.getElementById('resultado');
+            cont.innerHTML = '<p>Verificando…</p>';
+            try {
+                const res = await fetch('/api/certificaciones/verificar/' + encodeURIComponent(folio));
+                const d = await res.json();
+                render(d);
+            } catch (e) {
+                cont.className = 'estado noencontrado';
+                cont.innerHTML = '<div class="icono">⚠️</div><h2>Error de conexión</h2>';
+            }
+        }
+
+        function render(d) {
+            const cont = document.getElementById('resultado');
+            const det = (html) => `<div class="detalles">${html}</div>`;
+            if (d.exito && d.es_valido) {
+                cont.className = 'estado valido';
+                cont.innerHTML = '<div class="icono">✅</div><h2>DOCUMENTO VÁLIDO</h2>' + det(`
+                    <dl><dt>Folio</dt><dd>${d.folio_unico}</dd>
+                        <dt>Asambleísta</dt><dd>${d.nombre_asambleista}</dd>
+                        <dt>Cédula</dt><dd>${d.cedula}</dd>
+                        <dt>Emitido</dt><dd>${fmt(d.fecha_emision)}</dd>
+                        <dt>Hash SHA-256</dt><dd class="hash">${d.hash_sha256 || ''}</dd></dl>`);
+            } else if (d.exito && d.estado === 'ANULADO') {
+                cont.className = 'estado anulado';
+                cont.innerHTML = '<div class="icono">⛔</div><h2>DOCUMENTO ANULADO</h2>' + det(`
+                    <dl><dt>Folio</dt><dd>${d.folio_unico}</dd>
+                        <dt>Asambleísta</dt><dd>${d.nombre_asambleista}</dd>
+                        <dt>Estado</dt><dd>${d.mensaje}</dd></dl>`);
+            } else {
+                cont.className = 'estado noencontrado';
+                cont.innerHTML = '<div class="icono">❔</div><h2>FOLIO NO ENCONTRADO</h2><p style="color:#6b7280">No existe una certificación con ese folio.</p>';
+            }
+        }
+
+        document.getElementById('btnVerificar').addEventListener('click', () => {
+            const f = document.getElementById('inputFolio').value.trim();
+            if (f) verificar(f);
+        });
+
+        const fi = folioDeURL();
+        if (fi) { document.getElementById('inputFolio').value = fi; verificar(fi); }
+        else { document.getElementById('resultado').innerHTML = '<p style="color:#6b7280">Ingrese un folio para verificar.</p>'; }
+    </script>
+</body>
+</html>

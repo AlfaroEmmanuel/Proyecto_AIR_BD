@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emitir Certificación — AIR</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 1.5rem; color: #1f2937; }
+        .contenedor { max-width: 1000px; margin: 0 auto; }
+        .subtitulo { color: #6b7280; }
+        .panel { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; }
+        .form { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; height: fit-content; }
+        .form label { display: block; font-size: .85rem; margin: .8rem 0 .3rem; }
+        .form input { width: 100%; padding: .55rem; border: 1px solid #ccc; border-radius: 8px; }
+        .btn { width: 100%; margin-top: 1.2rem; padding: .65rem; background: #0f2b46; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+        .btn:disabled { background: #94a3b8; }
+        .preview { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; min-height: 600px; }
+        .preview iframe { width: 100%; height: 620px; border: none; border-radius: 12px; }
+        .placeholder { display: flex; align-items: center; justify-content: center; height: 620px; color: #9ca3af; }
+        .msg { margin-top: .8rem; font-size: .9rem; }
+        @media (max-width: 720px) { .panel { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="contenedor">
+        <h1>Emitir Certificación</h1>
+        <p class="subtitulo">Busque al asambleísta, previsualice y genere el documento oficial.</p>
+        <div class="panel">
+            <section class="form">
+                <label>Cédula del asambleísta *</label>
+                <input type="text" id="cedula" placeholder="3-0248-0440">
+                <label>Desde (opcional)</label>
+                <input type="date" id="desde">
+                <label>Hasta (opcional)</label>
+                <input type="date" id="hasta">
+                <button class="btn" id="btnGenerar">Generar Certificado Digital</button>
+                <div class="msg" id="msg"></div>
+            </section>
+            <section class="preview" id="preview">
+                <div class="placeholder">La previsualización del PDF aparecerá aquí.</div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        document.getElementById('btnGenerar').addEventListener('click', async () => {
+            const cedula = document.getElementById('cedula').value.trim();
+            const desde = document.getElementById('desde').value || undefined;
+            const hasta = document.getElementById('hasta').value || undefined;
+            const msg = document.getElementById('msg');
+            const btn = document.getElementById('btnGenerar');
+            if (!cedula) { msg.textContent = 'Ingrese la cédula.'; return; }
+
+            btn.disabled = true; msg.textContent = 'Generando…'; msg.style.color = '#6b7280';
+            try {
+                const res = await fetch('/api/certificacion/generar', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cedula, desde, hasta })
+                });
+                if (res.status === 401) { localStorage.clear(); location.href = '/login.html'; return; }
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    msg.textContent = err.mensaje || 'No se pudo generar.'; msg.style.color = '#b3261e';
+                    return;
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                document.getElementById('preview').innerHTML = `<iframe src="${url}"></iframe>`;
+                msg.textContent = 'Certificación generada y registrada.'; msg.style.color = '#1b7a3d';
+            } catch (e) {
+                msg.textContent = 'Error de conexión.'; msg.style.color = '#b3261e';
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

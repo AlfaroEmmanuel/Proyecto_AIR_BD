@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Sesión — AIR</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 1.5rem; color: #1f2937; }
+        .contenedor { max-width: 900px; margin: 0 auto; }
+        .subtitulo { color: #6b7280; }
+        .tabs { display: flex; gap: .5rem; border-bottom: 2px solid #e5e7eb; margin: 1.5rem 0; }
+        .tab { padding: .6rem 1.2rem; cursor: pointer; border: none; background: none; font-size: 1rem; border-bottom: 3px solid transparent; }
+        .tab.activa { border-bottom-color: #0f2b46; font-weight: 700; color: #0f2b46; }
+        .panel { display: none; } .panel.activo { display: block; }
+        .padron-item { display: flex; align-items: center; gap: .6rem; padding: .4rem .6rem; border-bottom: 1px solid #f3f4f6; }
+        .quorum { padding: .6rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-weight: 600; }
+        .quorum.ok { background: #e3f6e8; color: #1b7a3d; } .quorum.falla { background: #fdecec; color: #b3261e; }
+        .form-votacion { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; max-width: 480px; }
+        .form-votacion label { display: flex; flex-direction: column; font-size: .85rem; gap: .25rem; }
+        .btn { background: #0f2b46; color: #fff; border: none; padding: .55rem 1.1rem; border-radius: 8px; cursor: pointer; }
+        .btn:disabled { background: #94a3b8; }
+        input, select { padding: .45rem; border: 1px solid #ccc; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <main class="contenedor">
+        <h1 id="tituloSesion">Control de Sesión</h1>
+        <p id="infoSesion" class="subtitulo"></p>
+
+        <div class="tabs">
+            <button class="tab activa" data-panel="asistencia">Asistencia</button>
+            <button class="tab" data-panel="votaciones">Votaciones</button>
+        </div>
+
+        <section id="asistencia" class="panel activo">
+            <h2>Pase de lista</h2>
+            <div id="padron"></div>
+            <button id="btnGuardarAsistencia" class="btn" style="margin-top:1rem">Guardar asistencia</button>
+            <p id="msgAsistencia"></p>
+        </section>
+
+        <section id="votaciones" class="panel">
+            <div id="quorumBox" class="quorum">Verificando quórum…</div>
+            <h2>Registrar votación</h2>
+            <label>Propuesta: <select id="selPropuesta"></select></label>
+            <div class="form-votacion" style="margin-top:1rem">
+                <label>A favor <input type="number" id="vFavor" min="0" value="0"></label>
+                <label>En contra <input type="number" id="vContra" min="0" value="0"></label>
+                <label>Abstención <input type="number" id="vAbst" min="0" value="0"></label>
+            </div>
+            <button id="btnVotar" class="btn" style="margin-top:1rem">Registrar votación</button>
+            <p id="msgVotacion"></p>
+        </section>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+        const idSesion = new URLSearchParams(location.search).get('id');
+        let totalPresentes = 0;
+
+        document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(x => x.classList.remove('activa'));
+            document.querySelectorAll('.panel').forEach(x => x.classList.remove('activo'));
+            t.classList.add('activa');
+            document.getElementById(t.dataset.panel).classList.add('activo');
+            if (t.dataset.panel === 'votaciones') verificarQuorum();
+        }));
+
+        async function api(url, opts = {}) {
+            const res = await fetch(url, { headers, ...opts });
+            if (res.status === 401) { localStorage.clear(); location.href = '/login.html'; return null; }
+            return res.json();
+        }
+
+        async function cargarSesion() {
+            const r = await api(`/api/sesiones/${idSesion}`);
+            if (!r || !r.exito) return null;
+            const s = r.datos;
+            document.getElementById('tituloSesion').textContent = `Sesión ${s.numero_sesion}`;
+            document.getElementById('infoSesion').textContent =
+                `${s.tipo_sesion} · ${s.modalidad} · ${new Date(s.fecha_sesion).toLocaleDateString('es-CR')} · Quórum requerido: ${s.quorum_requerido}`;
+            totalPresentes = Number(s.total_presentes);
+            document.getElementById('selPropuesta').innerHTML =
+                (s.propuestas || []).map(p => `<option value="${p.id_propuesta}">${p.titulo} (${p.estado})</option>`).join('')
+                || '<option value="">Sin propuestas</option>';
+            return s;
+        }
+
+        async function cargarPadron() {
+            const r = await api('/api/asistencias/padron-vigente');
+            const lista = (r && r.datos) ? r.datos : [];
+            document.getElementById('padron').innerHTML = lista.map(a => `
+                <label class="padron-item">
+                    <input type="checkbox" class="chk-presente" value="${a.cedula}">
+                    ${a.nombre_completo} <small style="color:#9ca3af">(${a.cedula})</small>
+                </label>`).join('') || '<p style="color:#9ca3af">No se pudo cargar el padrón.</p>';
+        }
+
+        document.getElementById('btnGuardarAsistencia').addEventListener('click', async () => {
+            const presentes = [...document.querySelectorAll('.chk-presente:checked')].map(c => c.value);
+            const r = await api(`/api/asistencias/sesion/${idSesion}`, { method: 'POST', body: JSON.stringify({ presentes }) });
+            document.getElementById('msgAsistencia').textContent = r ? r.mensaje : 'Error.';
+            cargarSesion();
+        });
+
+        async function verificarQuorum() {
+            const s = await cargarSesion();
+            if (!s) return;
+            const box = document.getElementById('quorumBox');
+            const ok = Number(s.total_presentes) >= Number(s.quorum_requerido);
+            box.className = 'quorum ' + (ok ? 'ok' : 'falla');
+            box.textContent = ok
+                ? `Quórum alcanzado: ${s.total_presentes} presentes (mínimo ${s.quorum_requerido}).`
+                : `Sin quórum: ${s.total_presentes} de ${s.quorum_requerido} requeridos.`;
+            document.getElementById('btnVotar').disabled = !ok;
+        }
+
+        document.getElementById('btnVotar').addEventListener('click', async () => {
+            const body = {
+                id_propuesta: Number(document.getElementById('selPropuesta').value),
+                votos_favor: Number(document.getElementById('vFavor').value),
+                votos_contra: Number(document.getElementById('vContra').value),
+                votos_abstencion: Number(document.getElementById('vAbst').value),
+                total_presentes: totalPresentes
+            };
+            const r = await api(`/api/sesiones/${idSesion}/votacion`, { method: 'POST', body: JSON.stringify(body) });
+            document.getElementById('msgVotacion').textContent = r ? r.mensaje : 'Error.';
+        });
+
+        cargarSesion();
+        cargarPadron();
+    </script>
+</body>
+</html>
