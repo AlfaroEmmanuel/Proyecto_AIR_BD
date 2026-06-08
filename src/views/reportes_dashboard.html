@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes Administrativos — AIR</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 1.5rem; color: #1f2937; }
+        .contenedor { max-width: 960px; margin: 0 auto; }
+        .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .kpi { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; }
+        .kpi .valor { font-size: 2rem; font-weight: 700; } .kpi .label { color: #6b7280; font-size: .85rem; }
+        .reporte { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+        .reporte header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .btn-csv { background: #1b7a3d; color: #fff; border: none; padding: .45rem .9rem; border-radius: 8px; cursor: pointer; font-size: .85rem; }
+        .controles { margin-bottom: 1.5rem; }
+        canvas { max-height: 280px; }
+        table { width: 100%; border-collapse: collapse; } th, td { padding: .5rem; text-align: left; }
+    </style>
+</head>
+<body>
+    <main class="contenedor">
+        <h1>Reportes Administrativos</h1>
+        <div class="controles"><label>Año: <select id="selAnio"></select></label></div>
+        <section class="kpis" id="kpis"></section>
+
+        <section class="reporte">
+            <header><h2>Certificaciones por mes</h2>
+                <button class="btn-csv" data-csv="/api/reportes/certificaciones-mensuales">⬇ CSV</button></header>
+            <canvas id="chartMensual"></canvas>
+        </section>
+        <section class="reporte">
+            <header><h2>Distribución por sector</h2>
+                <button class="btn-csv" data-csv="/api/reportes/distribucion-sectores">⬇ CSV</button></header>
+            <canvas id="chartSectores"></canvas>
+        </section>
+        <section class="reporte">
+            <header><h2>Asambleístas más certificados</h2>
+                <button class="btn-csv" data-csv="/api/reportes/asambleistas-mas-certificados">⬇ CSV</button></header>
+            <table id="tablaTop"></table>
+        </section>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        const headers = { 'Authorization': 'Bearer ' + token };
+        let anio = new Date().getFullYear();
+        let chartMensual, chartSectores;
+
+        const sel = document.getElementById('selAnio');
+        for (let a = anio; a >= anio - 4; a--) { const o = document.createElement('option'); o.value = a; o.textContent = a; sel.appendChild(o); }
+        sel.addEventListener('change', () => { anio = Number(sel.value); cargarTodo(); });
+
+        async function getDatos(url) {
+            const res = await fetch(url, { headers });
+            if (res.status === 401) { localStorage.clear(); location.href = '/login.html'; return null; }
+            const r = await res.json();
+            return r && r.exito ? r.datos : null;
+        }
+
+        async function cargarKPIs() {
+            const k = await getDatos(`/api/reportes/kpis?anio=${anio}`);
+            if (!k) return;
+            document.getElementById('kpis').innerHTML = `
+                <div class="kpi"><div class="valor">${k.total_emitidas_anio ?? 0}</div><div class="label">Certificaciones emitidas (${anio})</div></div>
+                <div class="kpi"><div class="valor">${k.total_asambleistas_vigentes ?? 0}</div><div class="label">Asambleístas vigentes</div></div>
+                <div class="kpi"><div class="valor">${k.promedio_mensual ?? 0}</div><div class="label">Promedio mensual</div></div>`;
+        }
+
+        const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        async function cargarMensual() {
+            const datos = await getDatos(`/api/reportes/certificaciones-mensuales?anio=${anio}`);
+            if (!datos) return;
+            const v = Array(12).fill(0); datos.forEach(d => v[d.mes - 1] = d.total);
+            if (chartMensual) chartMensual.destroy();
+            chartMensual = new Chart(document.getElementById('chartMensual'), {
+                type: 'bar', data: { labels: MESES, datasets: [{ label: 'Certificaciones', data: v, backgroundColor: '#1b7a3d' }] },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+        async function cargarSectores() {
+            const datos = await getDatos('/api/reportes/distribucion-sectores');
+            if (!datos) return;
+            if (chartSectores) chartSectores.destroy();
+            chartSectores = new Chart(document.getElementById('chartSectores'), {
+                type: 'doughnut', data: { labels: datos.map(d => d.sector), datasets: [{ data: datos.map(d => d.total_asambleistas) }] }
+            });
+        }
+        async function cargarTop() {
+            const datos = await getDatos('/api/reportes/asambleistas-mas-certificados?limite=10');
+            if (!datos) return;
+            document.getElementById('tablaTop').innerHTML =
+                '<thead><tr><th>Cédula</th><th>Nombre</th><th style="text-align:right">Total</th></tr></thead><tbody>' +
+                datos.map(d => `<tr><td>${d.cedula}</td><td>${d.nombre}</td><td style="text-align:right">${d.total_certificaciones}</td></tr>`).join('') +
+                '</tbody>';
+        }
+
+        document.querySelectorAll('.btn-csv').forEach(btn => btn.addEventListener('click', async () => {
+            const base = btn.dataset.csv;
+            const url = base + (base.includes('certificaciones-mensuales') ? `?anio=${anio}&formato=csv` : '?formato=csv');
+            const res = await fetch(url, { headers });
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob); a.download = base.split('/').pop() + '.csv'; a.click();
+        }));
+
+        function cargarTodo() { cargarKPIs(); cargarMensual(); cargarSectores(); cargarTop(); }
+        cargarTodo();
+    </script>
+</body>
+</html>
