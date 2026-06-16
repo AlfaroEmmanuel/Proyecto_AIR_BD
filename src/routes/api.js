@@ -7,26 +7,34 @@ const router  = express.Router();
 const AuthController         = require('../controllers/AuthController');
 const AsambleistaController  = require('../controllers/AsambleistaController');
 const FolioController        = require('../controllers/FolioController');
-const SesionController       = require('../controllers/SesionController');
-const PropuestaController    = require('../controllers/PropuestaController');
-const AsistenciaController   = require('../controllers/AsistenciaController');
-const ComisionController     = require('../controllers/ComisionController');
-const ReportesController     = require('../controllers/ReportesController');
-const CertificadoController  = require('../controllers/CertificadoController');
-const AnulacionController    = require('../controllers/AnulacionController');
-const CatalogoController     = require('../controllers/CatalogoController');
+const SesionController      = require('../controllers/SesionController');
+const PropuestaController   = require('../controllers/PropuestaController');
+const AsistenciaController  = require('../controllers/AsistenciaController');
+const ComisionController    = require('../controllers/ComisionController');
+const ReportesController = require('../controllers/ReportesController');
+const CertificadoController = require('../controllers/CertificadoController');
+const AnulacionController   = require('../controllers/AnulacionController');
+const CatalogoController    = require('../controllers/CatalogoController');
 const { requireAuth, requireRole } = AuthController;
+
+
+// ---------------------------------------------------------------------
+// Catálogos de apoyo para la UI (periodos de gestión, sectores)
+// ---------------------------------------------------------------------
+router.get('/catalogos/periodos',
+    requireAuth,
+    CatalogoController.periodos
+);
+router.get('/catalogos/sectores',
+    requireAuth,
+    CatalogoController.sectores
+);
 
 
 // ---------------------------------------------------------------------
 // Issue #0 — Autenticación
 // ---------------------------------------------------------------------
 router.post('/login', AuthController.login);
-
-// ---------------------------------------------------------------------
-// Catálogos (alimentan los <select> de los formularios)
-// ---------------------------------------------------------------------
-router.get('/catalogos', requireAuth, CatalogoController.listar);
 
 // ---------------------------------------------------------------------
 // Issue #1 — Folios
@@ -74,13 +82,11 @@ router.get ('/sesiones/:id',
 router.post('/sesiones/:id/votacion',
     requireAuth, requireRole('Secretaria','Administrador'), SesionController.registrarVotacion);
 
-// Propuestas (#11) + leyenda legal (#5) + proponentes
+// Propuestas (#11) + leyenda legal (#5)
 router.post('/propuestas',
     requireAuth, requireRole('Secretaria','Administrador'), PropuestaController.crear);
 router.get ('/propuestas/:id_propuesta/leyenda',
     requireAuth, PropuestaController.obtenerLeyendaLegal);   // consumido por #17
-router.post('/propuestas/:id_propuesta/proponentes',
-    requireAuth, requireRole('Secretaria','Administrador'), PropuestaController.agregarProponentes);
 
 // ---------------------------------------------------------------------
 // Issue #12 — Asistencias
@@ -130,6 +136,7 @@ router.get('/reportes/certificaciones-historial',
 
 // ---------------------------------------------------------------------
 // Issue #17 — MOTOR: genera y devuelve el PDF inline
+// (Única ruta de generación: usa el motor completo, no el básico del Sprint 2)
 // ---------------------------------------------------------------------
 router.post('/certificacion/generar',
     requireAuth, requireRole('Secretaria','Administrador'),
