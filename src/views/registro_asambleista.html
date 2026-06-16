@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión de Asambleístas - DAIR</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin:30px; background:#fafafa; }
+        .container { max-width:640px; background:#fff; padding:25px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin:auto; }
+        h2 { color:#003366; }
+        .form-group { margin-bottom:15px; }
+        .row { display:flex; gap:12px; }
+        .row .form-group { flex:1; }
+        label { display:block; margin-bottom:5px; font-weight:bold; font-size:14px; }
+        input, select { width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; }
+        button { background:#003366; color:white; padding:12px 20px; border:none; border-radius:4px; cursor:pointer; font-size:16px; }
+        button:hover { background:#002244; }
+        .alert { margin-top:12px; padding:10px; border-radius:4px; display:none; }
+        .alert-success { background:#e2fbe8; color:#1e7e34; }
+        .alert-error { background:#fce8e6; color:#bd2130; }
+        .nav-link { display:inline-block; margin-bottom:16px; color:#3182ce; text-decoration:none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a class="nav-link" href="/listado_asambleistas.html">← Volver al listado</a>
+        <h2>Inscripción de Miembro de la AIR</h2>
+
+        <form id="registroForm">
+            <div class="form-group">
+                <label>Número de Cédula</label>
+                <input type="text" id="cedula" placeholder="Ej: 1-1234-0567" required>
+            </div>
+            <div class="row">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="nombre" required>
+                </div>
+                <div class="form-group">
+                    <label>Primer Apellido</label>
+                    <input type="text" id="apellido1" required>
+                </div>
+                <div class="form-group">
+                    <label>Segundo Apellido</label>
+                    <input type="text" id="apellido2">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Correo Institucional</label>
+                <input type="email" id="correo" placeholder="usuario@itcr.ac.cr" required>
+            </div>
+            <div class="row">
+                <div class="form-group">
+                    <label>Sector</label>
+                    <select id="sector" required>
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Periodo de Gestión</label>
+                    <select id="periodo" required>
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group">
+                    <label>Fecha de inicio</label>
+                    <input type="date" id="fecha_inicio" required>
+                </div>
+                <div class="form-group">
+                    <label>Fecha de fin</label>
+                    <input type="date" id="fecha_fin" required>
+                </div>
+            </div>
+            <button type="submit">Registrar Nombramiento</button>
+            <div id="alert" class="alert"></div>
+        </form>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        if (!token) window.location.href = '/login.html';
+        const alertBox = document.getElementById('alert');
+
+        function mostrarAlerta(tipo, mensaje) {
+            alertBox.className = 'alert alert-' + tipo;
+            alertBox.textContent = mensaje;
+            alertBox.style.display = 'block';
+        }
+
+        async function cargarCatalogos() {
+            try {
+                const [respSectores, respPeriodos] = await Promise.all([
+                    fetch('/api/catalogos/sectores', { headers: { 'Authorization': 'Bearer ' + token } }),
+                    fetch('/api/catalogos/periodos', { headers: { 'Authorization': 'Bearer ' + token } })
+                ]);
+
+                const sectoresData = await respSectores.json();
+                const selectSector = document.getElementById('sector');
+                selectSector.innerHTML = '';
+                if (sectoresData.exito && sectoresData.datos.length) {
+                    sectoresData.datos.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id_sector;
+                        opt.textContent = s.nombre_sector;
+                        selectSector.appendChild(opt);
+                    });
+                } else {
+                    selectSector.innerHTML = '<option value="">No hay sectores disponibles</option>';
+                }
+
+                const periodosData = await respPeriodos.json();
+                const selectPeriodo = document.getElementById('periodo');
+                selectPeriodo.innerHTML = '';
+                if (periodosData.exito && periodosData.datos.length) {
+                    periodosData.datos.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id_periodo;
+                        opt.textContent = `${p.anio_gestion} (${p.fecha_inicio.slice(0,10)} a ${p.fecha_fin.slice(0,10)})`;
+                        selectPeriodo.appendChild(opt);
+                    });
+                } else {
+                    selectPeriodo.innerHTML = '<option value="">No hay periodos disponibles</option>';
+                }
+            } catch (err) {
+                mostrarAlerta('error', 'No se pudieron cargar los catálogos de sector/periodo.');
+            }
+        }
+        cargarCatalogos();
+
+        document.getElementById('registroForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            alertBox.style.display = 'none';
+
+            const payload = {
+                cedula:           document.getElementById('cedula').value.trim(),
+                nombre:           document.getElementById('nombre').value.trim(),
+                primer_apellido:  document.getElementById('apellido1').value.trim(),
+                segundo_apellido: document.getElementById('apellido2').value.trim() || null,
+                correo:           document.getElementById('correo').value.trim(),
+                id_sector:        Number(document.getElementById('sector').value),
+                id_periodo:       Number(document.getElementById('periodo').value),
+                fecha_inicio:     document.getElementById('fecha_inicio').value,
+                fecha_fin:        document.getElementById('fecha_fin').value
+            };
+
+            try {
+                const resp = await fetch('/api/asambleistas', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await resp.json();
+                if (data.exito) {
+                    mostrarAlerta('success', data.mensaje);
+                    document.getElementById('registroForm').reset();
+                } else {
+                    mostrarAlerta('error', data.mensaje || 'Error en el registro.');
+                }
+            } catch (err) {
+                mostrarAlerta('error', 'No se pudo conectar con el servidor.');
+            }
+        });
+    </script>
+</body>
+</html>
