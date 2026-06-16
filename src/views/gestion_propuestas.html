@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Propuestas — AIR</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 1.5rem; color: #1f2937; }
+        .contenedor { max-width: 760px; margin: 0 auto; }
+        .subtitulo { color: #6b7280; }
+        .form { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+        label { display: block; font-size: .85rem; margin: .6rem 0 .3rem; }
+        input, select, textarea { width: 100%; padding: .55rem; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+        textarea { min-height: 70px; resize: vertical; }
+        .btn { margin-top: 1rem; padding: .6rem 1.2rem; background: #0f2b46; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+        .btn:disabled { background: #94a3b8; }
+        .msg { margin-top: .8rem; font-size: .9rem; }
+        .nav-link { color: #3182ce; text-decoration: none; font-size: .9rem; }
+        .oculto { display: none; }
+        .tags { display: flex; flex-wrap: wrap; gap: .4rem; margin: .6rem 0; }
+        .tag { background: #e3f6e8; color: #1b7a3d; padding: .25rem .6rem; border-radius: 999px; font-size: .8rem; display: flex; gap: .4rem; align-items: center; }
+        .tag button { border: none; background: none; cursor: pointer; color: #1b7a3d; font-weight: 700; }
+        .sugerencias { border: 1px solid #e5e7eb; border-radius: 8px; max-height: 160px; overflow-y: auto; }
+        .sugerencias div { padding: .45rem .7rem; cursor: pointer; } .sugerencias div:hover { background: #f5f5f7; }
+        .ok-box { background: #e3f6e8; color: #1b7a3d; padding: .6rem .9rem; border-radius: 8px; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <main class="contenedor">
+        <a class="nav-link" href="/gestion_sesiones.html">← Sesiones</a>
+        <h1>Gestión de Propuestas</h1>
+        <p class="subtitulo">Registra una propuesta en una sesión y asígnale sus proponentes.</p>
+
+        <!-- Paso 1: crear propuesta -->
+        <section class="form" id="formCrear">
+            <h2>Nueva propuesta</h2>
+            <label>Sesión</label><select id="sesion"></select>
+            <label>Título</label><input id="titulo" placeholder="Reforma al artículo 12…">
+            <label>Descripción</label><textarea id="descripcion"></textarea>
+            <label>Mayoría requerida</label><select id="mayoria"></select>
+            <label>Tipo de propuesta (define la leyenda legal, Issue #5)</label><select id="tipo"></select>
+            <button class="btn" id="btnCrear">Crear propuesta</button>
+            <div class="msg" id="msg"></div>
+        </section>
+
+        <!-- Paso 2: proponentes (aparece tras crear) -->
+        <section class="form oculto" id="formProponentes">
+            <div class="ok-box" id="okBox"></div>
+            <h2>Asignar proponentes</h2>
+            <div class="tags" id="tags"></div>
+            <label>Buscar asambleísta</label>
+            <input id="buscador" placeholder="Nombre o apellido…">
+            <div class="sugerencias" id="sugerencias"></div>
+            <button class="btn" id="btnProponentes">Guardar proponentes</button>
+            <div class="msg" id="msgProp"></div>
+        </section>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+        if (!token) location.href = '/login.html';
+        const sesionPre = new URLSearchParams(location.search).get('sesion');
+        let idPropuestaCreada = null;
+        const seleccionados = new Map();
+
+        async function api(url, opts = {}) {
+            const res = await fetch(url, { headers, ...opts });
+            if (res.status === 401) { localStorage.clear(); location.href = '/login.html'; return null; }
+            return res.json();
+        }
+
+        async function init() {
+            const [cat, ses] = await Promise.all([api('/api/catalogos'), api('/api/sesiones')]);
+            if (cat && cat.exito) {
+                document.getElementById('mayoria').innerHTML =
+                    cat.datos.tipo_mayoria.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+                document.getElementById('tipo').innerHTML =
+                    '<option value="">— Sin tipo —</option>' +
+                    cat.datos.tipo_propuesta.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+            }
+            const lista = (ses && ses.datos) ? ses.datos : [];
+            document.getElementById('sesion').innerHTML = lista.length
+                ? lista.map(s => `<option value="${s.id_sesion}" ${String(s.id_sesion) === sesionPre ? 'selected' : ''}>${s.numero_sesion}</option>`).join('')
+                : '<option value="">Cree una sesión primero</option>';
+        }
+
+        document.getElementById('btnCrear').addEventListener('click', async () => {
+            const body = {
+                titulo: document.getElementById('titulo').value.trim(),
+                descripcion: document.getElementById('descripcion').value.trim(),
+                id_sesion: Number(document.getElementById('sesion').value),
+                id_tipo_mayoria: Number(document.getElementById('mayoria').value),
+                id_tipo_propuesta: document.getElementById('tipo').value ? Number(document.getElementById('tipo').value) : null
+            };
+            const msg = document.getElementById('msg');
+            if (!body.titulo || !body.id_sesion) { msg.textContent = 'Título y sesión son obligatorios.'; msg.style.color = '#b3261e'; return; }
+            const r = await api('/api/propuestas', { method: 'POST', body: JSON.stringify(body) });
+            if (r && r.exito) {
+                idPropuestaCreada = r.datos.id_propuesta;
+                document.getElementById('formCrear').classList.add('oculto');
+                document.getElementById('okBox').textContent = `Propuesta #${idPropuestaCreada} creada: "${r.datos.titulo}". Ahora asígnale proponentes (opcional).`;
+                document.getElementById('formProponentes').classList.remove('oculto');
+            } else {
+                msg.textContent = (r && r.mensaje) || 'No se pudo crear la propuesta.'; msg.style.color = '#b3261e';
+            }
+        });
+
+        function renderTags() {
+            document.getElementById('tags').innerHTML =
+                [...seleccionados].map(([c, n]) => `<span class="tag">${n}<button data-c="${c}">×</button></span>`).join('');
+            document.querySelectorAll('.tag button').forEach(b =>
+                b.addEventListener('click', () => { seleccionados.delete(b.dataset.c); renderTags(); }));
+        }
+
+        let debounce;
+        document.getElementById('buscador').addEventListener('input', (e) => {
+            clearTimeout(debounce);
+            const q = e.target.value.trim();
+            if (q.length < 2) { document.getElementById('sugerencias').innerHTML = ''; return; }
+            debounce = setTimeout(async () => {
+                const r = await api('/api/asambleistas/buscar?nombre=' + encodeURIComponent(q));
+                const lista = Array.isArray(r) ? r : (r && r.datos ? r.datos : []);
+                document.getElementById('sugerencias').innerHTML = lista.map(a => {
+                    const nom = a.nombre_completo || `${a.nombre} ${a.primer_apellido || ''}`.trim();
+                    return `<div data-c="${a.cedula}" data-n="${nom}">${nom} (${a.cedula})</div>`;
+                }).join('');
+                document.querySelectorAll('#sugerencias div').forEach(d =>
+                    d.addEventListener('click', () => {
+                        seleccionados.set(d.dataset.c, d.dataset.n);
+                        renderTags();
+                        document.getElementById('sugerencias').innerHTML = '';
+                        document.getElementById('buscador').value = '';
+                    }));
+            }, 250);
+        });
+
+        document.getElementById('btnProponentes').addEventListener('click', async () => {
+            const msg = document.getElementById('msgProp');
+            if (seleccionados.size === 0) { msg.textContent = 'Selecciona al menos un asambleísta.'; msg.style.color = '#b3261e'; return; }
+            const proponentes = [...seleccionados.keys()].map(cedula => ({ cedula, rol: 'Proponente' }));
+            const r = await api(`/api/propuestas/${idPropuestaCreada}/proponentes`, { method: 'POST', body: JSON.stringify({ proponentes }) });
+            if (r && r.exito) {
+                msg.textContent = r.mensaje + ' Puede crear otra propuesta.'; msg.style.color = '#1b7a3d';
+                seleccionados.clear(); renderTags();
+            } else {
+                msg.textContent = (r && r.mensaje) || 'Error.'; msg.style.color = '#b3261e';
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>
