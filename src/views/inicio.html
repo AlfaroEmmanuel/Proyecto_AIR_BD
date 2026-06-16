@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio — Sistema AIR</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; background: #f3f4f6; color: #1f2937; }
+        header { background: #0f2b46; color: #fff; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.15rem; margin: 0; }
+        header .user { font-size: .85rem; opacity: .9; }
+        header button { background: rgba(255,255,255,.15); color: #fff; border: none; padding: .4rem .8rem; border-radius: 8px; cursor: pointer; margin-left: .8rem; }
+        main { max-width: 980px; margin: 2rem auto; padding: 0 1rem; }
+        .seccion { color: #6b7280; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; margin: 1.8rem 0 .6rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+        .card { display: block; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.1rem; text-decoration: none; color: inherit; transition: box-shadow .15s; }
+        .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+        .card h3 { margin: 0 0 .3rem; font-size: 1rem; color: #0f2b46; }
+        .card p { margin: 0; font-size: .85rem; color: #6b7280; }
+        .badge { font-size: .7rem; background: #e3f6e8; color: #1b7a3d; padding: .1rem .5rem; border-radius: 999px; margin-left: .4rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Sistema AIR — Asamblea Institucional Representativa</h1>
+        <div><span class="user" id="userInfo"></span><button id="btnSalir">Salir</button></div>
+    </header>
+
+    <main>
+        <div class="seccion">Asambleístas</div>
+        <div class="grid">
+            <a class="card" href="/listado_asambleistas.html"><h3>Listado y búsqueda</h3><p>Consultar el padrón y ver hojas de vida.</p></a>
+            <a class="card solo-gestion" href="/registro_asambleista.html"><h3>Registrar asambleísta</h3><p>Alta de identidad y nombramiento.</p></a>
+            <a class="card" href="/hoja_vida.html"><h3>Hoja de vida</h3><p>Trayectoria, asistencia, comisiones.</p></a>
+        </div>
+
+        <div class="seccion">Sesiones y comisiones</div>
+        <div class="grid">
+            <a class="card solo-gestion" href="/gestion_sesiones.html"><h3>Gestionar sesiones <span class="badge">#11</span></h3><p>Crear sesiones y entrar a su control.</p></a>
+            <a class="card solo-gestion" href="/gestion_propuestas.html"><h3>Gestionar propuestas <span class="badge">#11/#5</span></h3><p>Crear propuestas y asignar proponentes.</p></a>
+            <a class="card" href="/comisiones_listado.html"><h3>Comisiones <span class="badge">#6</span></h3><p>Crear, listar e integrar.</p></a>
+        </div>
+
+        <div class="seccion">Certificaciones</div>
+        <div class="grid">
+            <a class="card solo-gestion" href="/certificacion_emitir.html"><h3>Emitir certificación <span class="badge">#17</span></h3><p>Generar el PDF oficial con QR y hash.</p></a>
+            <a class="card solo-gestion" href="/certificaciones_historial.html"><h3>Historial</h3><p>Certificaciones emitidas y su estado.</p></a>
+            <a class="card" href="/validar_certificacion.html"><h3>Verificación pública</h3><p>Validar un folio por su número.</p></a>
+        </div>
+
+        <div class="seccion">Reportería</div>
+        <div class="grid">
+            <a class="card solo-gestion" href="/reportes_dashboard.html"><h3>Reportes administrativos <span class="badge">#16</span></h3><p>KPIs, gráficos y exportación CSV.</p></a>
+        </div>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('air_token');
+        const rol = localStorage.getItem('air_rol');
+        if (!token) location.href = '/login.html';
+
+        document.getElementById('userInfo').textContent = rol ? `Rol: ${rol}` : '';
+
+        if (rol !== 'Secretaria' && rol !== 'Administrador') {
+            document.querySelectorAll('.solo-gestion').forEach(c => c.style.display = 'none');
+        }
+
+        document.getElementById('btnSalir').addEventListener('click', () => {
+            localStorage.clear();
+            location.href = '/login.html';
+        });
+    </script>
+</body>
+</html>
