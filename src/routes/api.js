@@ -21,6 +21,10 @@ const { requireAuth, requireRole } = AuthController;
 // ---------------------------------------------------------------------
 // Catálogos de apoyo para la UI (periodos de gestión, sectores)
 // ---------------------------------------------------------------------
+router.get('/catalogos',
+    requireAuth,
+    CatalogoController.listar
+);
 router.get('/catalogos/periodos',
     requireAuth,
     CatalogoController.periodos
